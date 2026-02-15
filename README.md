@@ -30,6 +30,17 @@ Embedded C
 idf.py build  
 idf.py flash monitor
 
+## Project Output
+
+### Hardware Setup
+![Hardware Setup](images/rtos1.jpeg)
+
+### Serial Monitor Output
+![Terminal Output](images/rtos3.jpeg)
+
+### Boot Logs
+![Boot Logs](images/rtos2.jpeg)
+
 ## Author
 Jiya Kulkarni
 
