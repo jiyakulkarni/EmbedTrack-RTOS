@@ -4,6 +4,7 @@ idf_component_register(SRCS
     "sensor_task.c"
     "led_task.c"
     "system_task.c"
+    "mqtt_task.c"
     INCLUDE_DIRS "."
-    PRIV_REQUIRES dht11 esp_wifi esp_event nvs_flash esp_netif
+    PRIV_REQUIRES dht11 esp_wifi esp_event nvs_flash esp_netif esp-mqtt
 )

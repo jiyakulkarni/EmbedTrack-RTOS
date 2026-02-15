@@ -6,6 +6,7 @@
 static const char *TAG = "MAIN";
 extern void wifi_init(void);
 extern void wifi_status_task(void *);
+extern void mqtt_app_start(void);
 
 void app_main(void)
 {
@@ -17,7 +18,6 @@ void app_main(void)
     };
     nvs_flash_init();
     wifi_init();
-
     xTaskCreate(led_task, "LED_TASK", 4096, NULL, 5, NULL);
     xTaskCreate(sensor_task, "SENSOR_TASK", 4096, NULL, 5, NULL);
     xTaskCreate(system_task, "SYSTEM_TASK", 4096, NULL, 5, NULL);

@@ -19,38 +19,42 @@
 
 static EventGroupHandle_t wifi_event_group;
 static const char *TAG = "WIFI_TASK";
-
+void mqtt_app_start(void);
 
 /* ---------------- WiFi Event Handler ---------------- */
-
-static void wifi_event_handler(
-    void *arg,
-    esp_event_base_t event_base,
-    int32_t event_id,
-    void *event_data)
+static void wifi_event_handler(void* arg,
+                               esp_event_base_t event_base,
+                               int32_t event_id,
+                               void* event_data)
 {
-    if (event_base == WIFI_EVENT &&
-        event_id == WIFI_EVENT_STA_START)
+    if (event_base == WIFI_EVENT)
     {
-        esp_wifi_connect();
+        switch(event_id)
+        {
+            case WIFI_EVENT_STA_START:
+                esp_wifi_connect();
+                break;
+
+            case WIFI_EVENT_STA_DISCONNECTED:
+                esp_wifi_connect();
+                ESP_LOGI("WIFI_TASK", "Reconnecting...");
+                break;
+        }
     }
-    else if (event_base == WIFI_EVENT &&
-             event_id == WIFI_EVENT_STA_DISCONNECTED)
+
+    if (event_base == IP_EVENT)
     {
-        ESP_LOGW(TAG, "WiFi Disconnected");
-        xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
-        esp_wifi_connect();
-    }
-    else if (event_base == IP_EVENT &&
-             event_id == IP_EVENT_STA_GOT_IP)
-    {
-        ESP_LOGI(TAG, "WiFi Connected");
-        xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        switch(event_id)
+        {
+            case IP_EVENT_STA_GOT_IP:
+                ESP_LOGI("WIFI_TASK", "WiFi Connected");
+                mqtt_app_start();
+                break;
+        }
     }
 }
 
-
-/* ---------------- WiFi Initialization ---------------- */
+/* --------------- WiFi Initialization ---------------- */
 
 void wifi_init(void)
 {
