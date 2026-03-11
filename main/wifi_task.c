@@ -101,14 +101,12 @@ void wifi_init(void)
 
 void wifi_status_task(void *pv)
 {
-    esp_task_wdt_add(NULL);
-
+    
     bool last_state = false;
 
     while (1)
     {
-        esp_task_wdt_reset();
-
+        
         if (wifi_event_group == NULL)
         {
             ESP_LOGW(TAG, "Event group not ready");
