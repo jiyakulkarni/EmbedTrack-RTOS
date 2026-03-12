@@ -14,7 +14,9 @@
 #include "esp_random.h"
 #define WIFI_SSID "jiyak"
 #define WIFI_PASS "12345678"
+#include "common.h"
 
+system_state_t system_status = SYSTEM_WARNING;
 static const char *TAG = "MAIN";
 
 SemaphoreHandle_t resource1;
@@ -45,20 +47,23 @@ static void mqtt_event_handler(void *handler_args,
 {
     esp_mqtt_event_handle_t event = event_data;
 
-    switch(event_id)
+    switch(event->event_id)
     {
 
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI("MQTT","MQTT CONNECTED");
+            system_status = SYSTEM_OK;
             break;
 
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI("MQTT","Reconnecting...");
+            system_status = SYSTEM_WARNING;
             esp_mqtt_client_reconnect(client);
             break;
 
         case MQTT_EVENT_ERROR:
             ESP_LOGI("MQTT","MQTT ERROR");
+            system_status = SYSTEM_ERROR;
             break;
 
         default:
@@ -75,14 +80,19 @@ void wifi_event_handler(void* arg,
 {
 
     if(event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
-        esp_wifi_connect();
-
+    {
+         system_status = SYSTEM_WARNING;
+         esp_wifi_connect();
+    }
     else if(event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
-        esp_wifi_connect();
-
+    {
+    system_status = SYSTEM_WARNING;
+    esp_wifi_connect();
+    }
     else if(event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         ESP_LOGI("WIFI","WiFi Connected");
+        system_status = SYSTEM_WARNING;
         esp_mqtt_client_start(client);
     }
 }
@@ -139,7 +149,7 @@ void system_task(void *pv)
 void led_task_deadlock(void *pv)
 {
     esp_task_wdt_add(NULL);
-
+gpio_set_direction(GPIO_NUM_2, GPIO_MODE_OUTPUT);
     while(1)
     {
         ESP_LOGI("LED_TASK","LED Task trying resource2");
@@ -147,8 +157,9 @@ void led_task_deadlock(void *pv)
         xSemaphoreTake(resource2,portMAX_DELAY);
 
         ESP_LOGI("LED_TASK","LED Task got resource2");
+ gpio_set_level(GPIO_NUM_2, 1);
 
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(1000));
 
         ESP_LOGI("LED_TASK","LED Task waiting for resource1");
 
@@ -178,28 +189,53 @@ void sensor_task_deadlock(void *pv)
     }
 }
 
-
-
 void led_task_safe(void *pv)
 {
     esp_task_wdt_add(NULL);
 
+    gpio_set_direction(GPIO_NUM_2, GPIO_MODE_OUTPUT);
+
     while(1)
     {
-
         ESP_LOGI("LED_TASK","Safe mode trying resource1");
 
-        xSemaphoreTake(resource1,portMAX_DELAY);
+        xSemaphoreTake(resource1, portMAX_DELAY);
 
         ESP_LOGI("LED_TASK","Safe mode got resource1");
 
-        vTaskDelay(500/portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(500));
 
-        xSemaphoreTake(resource2,portMAX_DELAY);
+        xSemaphoreTake(resource2, portMAX_DELAY);
 
         ESP_LOGI("LED_TASK","Safe mode got resource2");
 
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+        /* -------- LED behaviour based on system state -------- */
+
+        if(system_status == SYSTEM_WARNING)
+        {
+            /* WARNING : slow blink */
+
+            gpio_set_level(GPIO_NUM_2,1);
+            vTaskDelay(pdMS_TO_TICKS(50));
+
+            gpio_set_level(GPIO_NUM_2,0);
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+
+        else if(system_status == SYSTEM_OK)
+        {
+            /* OK : LED ON */
+
+            gpio_set_level(GPIO_NUM_2,1);
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+
+        else if(system_status == SYSTEM_ERROR)
+        {
+            /* ERROR : extreme blink */
+            gpio_set_level(GPIO_NUM_2,0);
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
 
         xSemaphoreGive(resource2);
         xSemaphoreGive(resource1);
@@ -208,10 +244,9 @@ void led_task_safe(void *pv)
 
         esp_task_wdt_reset();
 
-        vTaskDelay(2000/portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
-
 
 
 void sensor_task_safe(void *pv)
@@ -265,10 +300,8 @@ void sensor_task_safe(void *pv)
 }
 
 
-
 void app_main(void)
 {
-
     print_reset_reason();
 
     ESP_LOGI(TAG,"RTOS Project Starting");
